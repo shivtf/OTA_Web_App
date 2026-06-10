@@ -38,7 +38,7 @@ function Navbar() {
           {["Home", "Flights", "Hotels", "Cars", "Contact us"].map((item) => (
             <a
               key={item}
-              href="#"
+              href={item}
               className="hover:text-blue-600 transition-colors"
             >
               {item}

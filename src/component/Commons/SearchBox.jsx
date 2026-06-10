@@ -1,11 +1,13 @@
 // components/SearchBox.jsx
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plane,
   Hotel,
   Car,
-  Package,
   Search,
   ArrowLeftRight,
   Calendar,
@@ -15,6 +17,8 @@ import {
   Minus,
   ChevronLeft,
   ChevronRight,
+  MapPin,
+  Loader2,
 } from "lucide-react";
 
 const TABS = [
@@ -46,19 +50,19 @@ function parseDate(str) {
 }
 function toISO(d) {
   if (!d) return "";
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function fmt(str) {
   const d = parseDate(str);
-  if (!d) return "";
-  return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`;
+  return d
+    ? `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`
+    : "";
 }
 function fmtShort(str) {
   const d = parseDate(str);
-  if (!d) return "";
-  return `${DAYS_FULL[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
+  return d
+    ? `${DAYS_FULL[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`
+    : "";
 }
 
 const LABEL = {
@@ -67,7 +71,7 @@ const LABEL = {
   color: "#9ca3af",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  marginBottom: 10,
+  marginBottom: 6,
 };
 const BOX = {
   border: "1px solid #d1d5db",
@@ -82,10 +86,235 @@ const BOX = {
   outline: "none",
   fontFamily: "inherit",
   transition: "border-color 0.15s",
-  cursor: "pointer",
+  cursor: "text",
 };
 
-// ── Custom Calendar Picker ────────────────────────────────────────────────────
+// ── Place Autocomplete Input ─────────────────────────────────────────────────
+function PlaceInput({
+  label,
+  value,
+  onChange,
+  placeholder = "City or airport",
+}) {
+  const [query, setQuery] = useState(value?.name || "");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const debounceRef = useRef(null);
+
+  // Sync external value changes (e.g. swap)
+  useEffect(() => {
+    setQuery(value?.name || "");
+  }, [value?.name]);
+
+  // Close on outside click
+  useEffect(() => {
+    const fn = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
+
+  function handleChange(e) {
+    const q = e.target.value;
+    setQuery(q);
+    onChange(null); // clear selected until user picks
+
+    clearTimeout(debounceRef.current);
+    if (q.trim().length < 2) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `${BASE_URL}/meta/places/search?q=${encodeURIComponent(q.trim())}`,
+        );
+        const json = await res.json();
+        // API returns { success, message, data: [...] }
+        const places = Array.isArray(json.data)
+          ? json.data
+          : Array.isArray(json)
+            ? json
+            : [];
+        console.log("[PlaceInput] results:", places);
+        setResults(places);
+        setOpen(places.length > 0);
+      } catch (err) {
+        console.error("[PlaceInput] fetch error:", err);
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+  }
+
+  function handleSelect(place) {
+    setQuery(`${place.name} (${place.iataCode})`);
+    onChange(place);
+    setOpen(false);
+    setResults([]);
+  }
+
+  const typeIcon = (type) => {
+    if (type === "airport") return "✈";
+    if (type === "city") return "🏙";
+    return "📍";
+  };
+
+  return (
+    <div
+      ref={ref}
+      style={{ flex: "1 1 0", minWidth: 140, position: "relative" }}
+    >
+      <div style={LABEL}>{label}</div>
+      <div style={{ position: "relative" }}>
+        <input
+          style={{
+            ...BOX,
+            paddingRight: 32,
+            borderColor: open ? "#2563eb" : "#d1d5db",
+          }}
+          value={query}
+          onChange={handleChange}
+          onFocus={() => {
+            if (results.length) setOpen(true);
+          }}
+          placeholder={placeholder}
+          autoComplete="off"
+        />
+        <div
+          style={{
+            position: "absolute",
+            right: 10,
+            top: "50%",
+            transform: "translateY(-50%)",
+            pointerEvents: "none",
+          }}
+        >
+          {loading ? (
+            <Loader2
+              style={{
+                width: 14,
+                height: 14,
+                color: "#9ca3af",
+                animation: "spin 1s linear infinite",
+              }}
+            />
+          ) : (
+            <MapPin style={{ width: 14, height: 14, color: "#9ca3af" }} />
+          )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {open && results.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.13 }}
+            style={{
+              position: "absolute",
+              top: "calc(100% + 6px)",
+              left: 0,
+              width: "max(100%, 280px)",
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 12,
+              boxShadow: "0 8px 30px rgba(0,0,0,0.13)",
+              zIndex: 300,
+              overflow: "hidden",
+            }}
+          >
+            {results.map((place, i) => (
+              <div
+                key={place.id || i}
+                onClick={() => handleSelect(place)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 14px",
+                  cursor: "pointer",
+                  borderBottom:
+                    i < results.length - 1 ? "1px solid #f3f4f6" : "none",
+                  transition: "background 0.1s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#f8faff")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "#fff")
+                }
+              >
+                {/* Icon */}
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: "#eff6ff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 15,
+                    flexShrink: 0,
+                  }}
+                >
+                  {typeIcon(place.type)}
+                </div>
+
+                {/* Text */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#111827",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {place.name}
+                    {place.iataCode && (
+                      <span
+                        style={{
+                          marginLeft: 6,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#2563eb",
+                          background: "#eff6ff",
+                          padding: "1px 6px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        {place.iataCode}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>
+                    {[place.city, place.country].filter(Boolean).join(", ")}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <style>{`@keyframes spin { from { transform: translateY(-50%) rotate(0deg); } to { transform: translateY(-50%) rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+// ── Calendar Picker ─────────────────────────────────────────────────────────
 function CalendarPicker({ label, value, onChange, minDate }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -120,7 +349,6 @@ function CalendarPicker({ label, value, onChange, minDate }) {
     );
   }
 
-  // Build calendar grid
   const firstDay = new Date(view.year, view.month, 1).getDay();
   const daysInMonth = new Date(view.year, view.month + 1, 0).getDate();
   const cells = [];
@@ -137,38 +365,30 @@ function CalendarPicker({ label, value, onChange, minDate }) {
     onChange(toISO(picked));
     setOpen(false);
   }
-
-  function isSelected(day) {
-    if (!day || !selected) return false;
-    return (
-      selected.getFullYear() === view.year &&
-      selected.getMonth() === view.month &&
-      selected.getDate() === day
-    );
-  }
-  function isToday(day) {
-    if (!day) return false;
-    return (
-      today.getFullYear() === view.year &&
-      today.getMonth() === view.month &&
-      today.getDate() === day
-    );
-  }
-  function isDisabled(day) {
+  const isSelected = (day) =>
+    day &&
+    selected &&
+    selected.getFullYear() === view.year &&
+    selected.getMonth() === view.month &&
+    selected.getDate() === day;
+  const isToday = (day) =>
+    day &&
+    today.getFullYear() === view.year &&
+    today.getMonth() === view.month &&
+    today.getDate() === day;
+  const isDisabled = (day) => {
     if (!day || !minD) return false;
-    const d = new Date(view.year, view.month, day, 12);
-    return d < minD;
-  }
+    return new Date(view.year, view.month, day, 12) < minD;
+  };
 
   return (
     <div ref={ref} style={{ minWidth: 140, position: "relative" }}>
       <div style={LABEL}>{label}</div>
-
-      {/* Trigger */}
       <div
         onClick={() => setOpen((o) => !o)}
         style={{
           ...BOX,
+          cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -198,7 +418,6 @@ function CalendarPicker({ label, value, onChange, minDate }) {
         />
       </div>
 
-      {/* Calendar Panel */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -219,7 +438,6 @@ function CalendarPicker({ label, value, onChange, minDate }) {
               overflow: "hidden",
             }}
           >
-            {/* Header */}
             <div
               style={{
                 background: "#2563eb",
@@ -249,7 +467,6 @@ function CalendarPicker({ label, value, onChange, minDate }) {
               )}
             </div>
 
-            {/* Month nav */}
             <div
               style={{
                 display: "flex",
@@ -293,7 +510,6 @@ function CalendarPicker({ label, value, onChange, minDate }) {
               </button>
             </div>
 
-            {/* Day names */}
             <div
               style={{
                 display: "grid",
@@ -318,7 +534,6 @@ function CalendarPicker({ label, value, onChange, minDate }) {
               ))}
             </div>
 
-            {/* Grid */}
             <div
               style={{
                 display: "grid",
@@ -328,9 +543,9 @@ function CalendarPicker({ label, value, onChange, minDate }) {
               }}
             >
               {cells.map((day, i) => {
-                const sel = isSelected(day);
-                const tod = isToday(day);
-                const dis = isDisabled(day);
+                const sel = isSelected(day),
+                  tod = isToday(day),
+                  dis = isDisabled(day);
                 return (
                   <div
                     key={i}
@@ -380,7 +595,6 @@ function CalendarPicker({ label, value, onChange, minDate }) {
               })}
             </div>
 
-            {/* Footer */}
             <div
               style={{
                 borderTop: "1px solid #f3f4f6",
@@ -429,7 +643,7 @@ function CalendarPicker({ label, value, onChange, minDate }) {
   );
 }
 
-// ── Travelers Dropdown ────────────────────────────────────────────────────────
+// ── Travelers Dropdown ───────────────────────────────────────────────────────
 function TravelersDropdown({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const [adults, setAdults] = useState(value.adults);
@@ -531,6 +745,7 @@ function TravelersDropdown({ value, onChange }) {
         onClick={() => setOpen((o) => !o)}
         style={{
           ...BOX,
+          cursor: "pointer",
           display: "flex",
           alignItems: "center",
           gap: 6,
@@ -665,20 +880,102 @@ function TravelersDropdown({ value, onChange }) {
   );
 }
 
-// ── Main SearchBox ────────────────────────────────────────────────────────────
+// ── Main SearchBox ───────────────────────────────────────────────────────────
 export default function SearchBox({ defaultTab = "flights", onSearch }) {
+  const today = new Date();
+  const defaultDepart = today.toISOString().split("T")[0];
+  const returnDay = new Date();
+  returnDay.setDate(returnDay.getDate() + 7);
+  const defaultReturnDate = returnDay.toISOString().split("T")[0];
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(defaultTab);
-  const [from, setFrom] = useState("New York (JFK)");
-  const [to, setTo] = useState("Los Angeles (LAX)");
-  const [depart, setDepart] = useState("2025-05-24");
-  const [returnDate, setReturnDate] = useState("2025-05-31");
+  const [from, setFrom] = useState(null);
+  const [to, setTo] = useState(null);
+  const [depart, setDepart] = useState(defaultDepart);
+  const [returnDate, setReturnDate] = useState(defaultReturnDate);
   const [showReturn, setShowReturn] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [travelers, setTravelers] = useState({
     adults: 1,
     children: 0,
     infants: 0,
     cabinClass: "Economy",
   });
+
+  async function handleSearch() {
+    if (!from?.iataCode || !to?.iataCode) {
+      alert("Please select a valid origin and destination.");
+      return;
+    }
+    if (!depart) {
+      alert("Please select a departure date.");
+      return;
+    }
+
+    if (activeTab === "flights") {
+      setLoading(true);
+      try {
+        const payload = {
+          origin: from.iataCode,
+          destination: to.iataCode,
+          departureDate: depart,
+          adults: travelers.adults,
+          children: travelers.children,
+          infants: travelers.infants,
+          cabinClass: travelers.cabinClass.toLowerCase().replace(/ /g, "_"),
+        };
+        const res = await fetch(`${BASE_URL}/flights/search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+
+        // Call optional callback
+        onSearch?.({
+          tab: activeTab,
+          from,
+          to,
+          depart,
+          returnDate,
+          travelers,
+          result: data,
+        });
+
+        // Navigate to results page, passing results + search params via router state
+        navigate("/flights/results", {
+          state: {
+            searchParams: payload,
+            from,
+            to,
+            returnDate: showReturn ? returnDate : null,
+            travelers,
+            result: data,
+          },
+        });
+      } catch (err) {
+        console.error("Flight search error:", err);
+        onSearch?.({
+          tab: activeTab,
+          from,
+          to,
+          depart,
+          returnDate,
+          travelers,
+          error: err,
+        });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      onSearch?.({ tab: activeTab, from, to, depart, returnDate, travelers });
+    }
+  }
+
+  function handleSwap() {
+    setFrom(to);
+    setTo(from);
+  }
 
   return (
     <motion.div
@@ -687,14 +984,14 @@ export default function SearchBox({ defaultTab = "flights", onSearch }) {
       transition={{ delay: 0.2, duration: 0.4 }}
       style={{ width: "100%", position: "relative", zIndex: 10 }}
     >
-      {/* ── TABS — white bg terminates after "Cars" ── */}
+      {/* ── TABS ── */}
       <div
         style={{
           display: "inline-flex",
           background: "#fff",
-          borderRadius: "16px 16px 0 0",
+          borderRadius: "12px 12px 0 0",
           paddingLeft: 20,
-          paddingTop: 12,
+          paddingTop: 10,
           paddingRight: 4,
         }}
       >
@@ -705,9 +1002,9 @@ export default function SearchBox({ defaultTab = "flights", onSearch }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "8px 36px 10px",
-              fontSize: 16,
+              gap: 6,
+              padding: "8px 18px 10px",
+              fontSize: 14,
               fontWeight: activeTab === id ? 600 : 500,
               whiteSpace: "nowrap",
               border: "none",
@@ -723,8 +1020,8 @@ export default function SearchBox({ defaultTab = "flights", onSearch }) {
           >
             <Icon
               style={{
-                width: 15,
-                height: 15,
+                width: 14,
+                height: 14,
                 flexShrink: 0,
                 color: activeTab === id ? "#2563eb" : "#9ca3af",
               }}
@@ -734,14 +1031,13 @@ export default function SearchBox({ defaultTab = "flights", onSearch }) {
         ))}
       </div>
 
-      {/* ── FIELDS + FOOTER — full width white card ── */}
+      {/* ── CARD ── */}
       <div
         style={{
           width: "100%",
           background: "#fff",
-          borderRadius: "0 16px 16px 16px",
+          borderRadius: "0 12px 12px 12px",
           boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
-          paddingTop: "6px",
         }}
       >
         {/* FIELDS */}
@@ -750,28 +1046,19 @@ export default function SearchBox({ defaultTab = "flights", onSearch }) {
             display: "flex",
             alignItems: "flex-end",
             gap: 8,
-            padding: "14px 16px 14px 20px",
+            padding: "16px 16px 14px 20px",
           }}
         >
-          {/* FROM */}
-          <div style={{ flex: "1 1 0", minWidth: 120 }}>
-            <div style={LABEL}>From</div>
-            <input
-              style={BOX}
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              placeholder="City or airport"
-              onFocus={(e) => (e.target.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
-            />
-          </div>
+          <PlaceInput
+            label="From"
+            value={from}
+            onChange={setFrom}
+            placeholder="City or airport"
+          />
 
           {/* Swap */}
           <button
-            onClick={() => {
-              setFrom(to);
-              setTo(from);
-            }}
+            onClick={handleSwap}
             aria-label="Swap"
             style={{
               flexShrink: 0,
@@ -792,18 +1079,12 @@ export default function SearchBox({ defaultTab = "flights", onSearch }) {
             />
           </button>
 
-          {/* TO */}
-          <div style={{ flex: "1 1 0", minWidth: 120 }}>
-            <div style={LABEL}>To</div>
-            <input
-              style={BOX}
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="City or airport"
-              onFocus={(e) => (e.target.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
-            />
-          </div>
+          <PlaceInput
+            label="To"
+            value={to}
+            onChange={setTo}
+            placeholder="City or airport"
+          />
 
           <CalendarPicker label="Depart" value={depart} onChange={setDepart} />
 
@@ -821,35 +1102,28 @@ export default function SearchBox({ defaultTab = "flights", onSearch }) {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
-            onClick={() =>
-              onSearch?.({
-                tab: activeTab,
-                from,
-                to,
-                depart,
-                returnDate,
-                travelers,
-              })
-            }
+            onClick={handleSearch}
+            disabled={loading}
             style={{
               flexShrink: 0,
               display: "flex",
               alignItems: "center",
               gap: 8,
-              background: "#2563eb",
+              background: loading ? "#93c5fd" : "#2563eb",
               color: "#fff",
               padding: "9px 20px",
               borderRadius: 10,
               fontWeight: 600,
               fontSize: 14,
               border: "none",
-              cursor: "pointer",
+              cursor: loading ? "not-allowed" : "pointer",
               whiteSpace: "nowrap",
               boxShadow: "0 2px 8px rgba(37,99,235,0.25)",
+              transition: "background 0.2s",
             }}
           >
             <Search style={{ width: 15, height: 15 }} />
-            Search flights
+            {loading ? "Searching…" : "Search flights"}
           </motion.button>
         </div>
 
