@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   Plane,
   Hotel,
   Car,
-  Gift,
   Search,
-  Globe,
   ChevronDown,
   ArrowLeftRight,
   Calendar,
@@ -28,9 +27,6 @@ import {
 } from "lucide-react";
 import Navbar from "../Navbar/navbar";
 
-// ── Inline SVG social icons ──────────────────────────────────────────────────
-// lucide-react v1+ removed Facebook, Instagram, Twitter, Youtube.
-// These drop-in replacements match the same API: className prop, currentColor.
 const IconFacebook = ({ className = "w-4 h-4" }) => (
   <svg
     className={className}
@@ -81,18 +77,13 @@ const IconYoutube = ({ className = "w-4 h-4" }) => (
     <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white" />
   </svg>
 );
-// ─────────────────────────────────────────────────────────────────────────────
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
   visible: (i = 0) => ({
     opacity: 1,
     y: 0,
-    transition: {
-      delay: i * 0.08,
-      duration: 0.5,
-      ease: "easeOut",
-    },
+    transition: { delay: i * 0.08, duration: 0.5, ease: "easeOut" },
   }),
 };
 
@@ -299,15 +290,16 @@ const AirlineLogo = ({ airline, color }) => (
 );
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [likedHotels, setLikedHotels] = useState({});
   const [activeTab, setActiveTab] = useState("flights");
+
   const tabs = [
     { id: "flights", label: "Flights", icon: Plane },
     { id: "hotels", label: "Hotels", icon: Hotel },
     { id: "cars", label: "Cars", icon: Car },
   ];
 
-  // Social icon components keyed for the footer map
   const socialIcons = [
     { Icon: IconFacebook, label: "Facebook" },
     { Icon: IconInstagram, label: "Instagram" },
@@ -328,7 +320,6 @@ export default function Dashboard() {
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent" />
-
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-14 pb-32 md:pt-20 md:pb-40">
           <motion.p
             initial="hidden"
@@ -385,11 +376,7 @@ export default function Dashboard() {
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all rounded-t-lg -mb-px ${
-                  activeTab === id
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all rounded-t-lg -mb-px ${activeTab === id ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}
               >
                 <Icon className="w-4 h-4" /> {label}
               </button>
@@ -464,6 +451,7 @@ export default function Dashboard() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => navigate("/flights/results")}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-xl font-semibold text-sm transition"
             >
               <Search className="w-4 h-4" /> Search flights
@@ -581,10 +569,7 @@ export default function Dashboard() {
                 viewport={{ once: true }}
                 variants={fadeUp}
                 custom={i * 0.5}
-                whileHover={{
-                  y: -2,
-                  boxShadow: "0 8px 30px rgba(0,0,0,0.10)",
-                }}
+                whileHover={{ y: -2, boxShadow: "0 8px 30px rgba(0,0,0,0.10)" }}
                 className="bg-white border border-gray-100 rounded-2xl p-4 cursor-pointer transition-all"
               >
                 <div className="flex items-center justify-between mb-3">
@@ -664,10 +649,7 @@ export default function Dashboard() {
                   </div>
                   <button
                     onClick={() =>
-                      setLikedHotels((p) => ({
-                        ...p,
-                        [name]: !p[name],
-                      }))
+                      setLikedHotels((p) => ({ ...p, [name]: !p[name] }))
                     }
                     className="absolute top-2 right-2 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:scale-110 transition"
                   >
@@ -711,7 +693,6 @@ export default function Dashboard() {
       {/* HOW IT WORKS + WHY CHOOSE */}
       <section className="bg-gray-50 mt-8 py-14">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-12">
-          {/* How it works */}
           <div>
             <h2 className="text-2xl font-bold mb-8">How it works</h2>
             <div className="space-y-6">
@@ -764,8 +745,6 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-
-          {/* Why choose */}
           <div>
             <h2 className="text-2xl font-bold mb-8">
               Why choose Travel4Pennies?
@@ -846,7 +825,6 @@ export default function Dashboard() {
                 Your trusted travel partner for flights, hotels and
                 unforgettable experiences.
               </p>
-              {/* Social icons — inline SVGs replace removed lucide-react exports */}
               <div className="flex gap-3 mt-4">
                 {socialIcons.map(({ Icon, label }) => (
                   <a

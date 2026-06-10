@@ -1,65 +1,63 @@
-import React from "react";
-import {
-  Plane,
-  Hotel,
-  Car,
-  Gift,
-  Search,
-  Globe,
-  ChevronDown,
-  ArrowLeftRight,
-  Calendar,
-  Users,
-  Shield,
-  Tag,
-  Zap,
-  Headphones,
-  CalendarCheck,
-  Star,
-  Heart,
-  ChevronRight,
-  Mail,
-  CheckCircle,
-  Clock,
-  CreditCard,
-  Lock,
-  LifeBuoy,
-} from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Plane } from "lucide-react";
 
-function Navbar() {
+export default function Navbar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const links = [
+    { label: "Home", path: "/" },
+    { label: "Flights", path: "/flights" },
+    { label: "Hotels", path: "/hotels" },
+    { label: "Cars", path: "/cars" },
+    { label: "Contact us", path: "/contact" },
+  ];
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 font-bold text-xl text-blue-600">
-          <Plane className="w-5 h-5" />
-          <span>Travel4Pennies</span>
-        </div>
-        <nav className="hidden md:flex items-center gap-6 text-sm text-gray-600">
-          {["Home", "Flights", "Hotels", "Cars", "Contact us"].map((item) => (
-            <a
-              key={item}
-              href="#"
-              className="hover:text-blue-600 transition-colors"
-            >
-              {item}
-            </a>
+    <nav className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
+        {/* Logo */}
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 font-extrabold text-lg text-blue-600"
+        >
+          <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
+            <Plane className="w-4 h-4 text-white" />
+          </div>
+          Travel4Pennies
+        </button>
+
+        {/* Nav links */}
+        <ul className="hidden md:flex items-center gap-6">
+          {links.map(({ label, path }) => (
+            <li key={label}>
+              <button
+                onClick={() => navigate(path)}
+                className={`text-sm font-medium transition ${
+                  location.pathname === path
+                    ? "text-blue-600"
+                    : "text-gray-600 hover:text-blue-600"
+                }`}
+              >
+                {label}
+              </button>
+            </li>
           ))}
-        </nav>
-        <div className="flex items-center gap-2">
-          <button className="hidden md:flex items-center gap-1 text-sm text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition">
-            <Globe className="w-4 h-4" /> USD{" "}
-            <ChevronDown className="w-3 h-3" />
-          </button>
-          <button className="text-sm px-4 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+        </ul>
+
+        {/* Actions */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500 flex items-center gap-1 cursor-pointer hover:text-gray-800 transition">
+            🌐 USD ▾
+          </span>
+          <button className="text-sm font-medium text-gray-600 hover:text-blue-600 transition px-3 py-1.5">
             Log in
           </button>
-          <button className="text-sm px-4 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition">
+          <button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition">
             Sign up
           </button>
         </div>
       </div>
-    </header>
+    </nav>
   );
 }
-
-export default Navbar;

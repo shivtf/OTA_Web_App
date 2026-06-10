@@ -1,16 +1,14 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
-import heroImg from "./assets/hero.png";
-import "./App.css";
+import { Routes, Route } from "react-router-dom";
 import Dashboard from "./component/Dashboard/dashboard";
+import FlightsPage from "./component/Flight/flightPage";
+import FlightResults from "./component/Flight/flightResult";
 
-function App() {
+export default function App() {
   return (
-    <>
-      <Dashboard />
-    </>
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/flights" element={<FlightsPage />} />
+      <Route path="/flights/results" element={<FlightResults />} />
+    </Routes>
   );
 }
-
-export default App;
