@@ -893,7 +893,7 @@ export default function SearchBox({ defaultTab = "flights", onSearch }) {
   const [to, setTo] = useState(null);
   const [depart, setDepart] = useState(defaultDepart);
   const [returnDate, setReturnDate] = useState(defaultReturnDate);
-  const [showReturn, setShowReturn] = useState(true);
+  const [showReturn, setShowReturn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [travelers, setTravelers] = useState({
     adults: 1,
